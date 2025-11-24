@@ -1,0 +1,7 @@
+# Zigbee / IEEE 802.15.4 profile inputs, including stricter duty-cycle caps.
+range_m: 30
+throughput_kbps: 250
+tx_power_mw: 35
+rx_power_mw: 30
+sleep_power_mw: 0.01
+duty_cycle_limit: 0.01

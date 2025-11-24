@@ -1,0 +1,9 @@
+# Central place to store experiment parameters (E1/E2/E3) without touching code.
+# Each entry can be loaded by scenario_loader to configure populations and events.
+duty_cycle_sweep:
+  sleep_ratios: [0.2, 0.5, 0.8]
+protocol_compare:
+  radios: ["ble", "wifi", "zigbee"]
+topology_failover:
+  broker_failover_time_s: 600
+  persistent_sessions: [true, false]

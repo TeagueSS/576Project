@@ -1,0 +1,8 @@
+# BLE 5.x profile inputs: range, data rate, TX/RX power, duty-cycle caps.
+# Populate with concrete values when calibrating experiments.
+range_m: 50
+throughput_kbps: 2000
+tx_power_mw: 10
+rx_power_mw: 8
+sleep_power_mw: 0.02
+duty_cycle_limit: 1.0

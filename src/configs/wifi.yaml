@@ -1,0 +1,7 @@
+# Wi-Fi 802.11n profile inputs: range, PHY rate, CSMA params, power draw.
+range_m: 120
+throughput_mbps: 150
+tx_power_mw: 350
+rx_power_mw: 250
+idle_power_mw: 70
+contention_window: [15, 1023]
