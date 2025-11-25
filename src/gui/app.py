@@ -4,7 +4,7 @@ import random
 from ..sim.environment import SimulationEnvironment
 from ..sim.metrics import MetricsCollector
 
-# Import View Components
+# Import Views
 from .views.controls import TopBar
 from .views.palette import NodePalette
 from .views.map_view import InteractiveMapView
@@ -25,8 +25,9 @@ class IotSimulationApp(tk.Tk):
         self.is_running = False
 
         # --- State ---
+        self.current_experiment = "E3: Topology Failover"
         self.nodes = []
-        self.walls = []  # List of ((x1,y1), (x2,y2)) tuples
+        self.walls = []
         self.selected_node_id = None
         self.placement_mode = None
         self.broker_queue = [0] * 50
@@ -47,9 +48,11 @@ class IotSimulationApp(tk.Tk):
         self.main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashwidth=6, bg="#d9d9d9")
         self.main_pane.grid(row=1, column=0, sticky="nsew")
 
-        self.palette = NodePalette(self.main_pane, self.on_palette_click)
+        # Left
+        self.palette = NodePalette(self.main_pane, self.on_palette_click, self.on_simulation_type_changed)
         self.main_pane.add(self.palette, minsize=220, width=250)
 
+        # Center
         self.center_frame = tk.Frame(self.main_pane)
         self.main_pane.add(self.center_frame, minsize=600, width=900)
 
@@ -60,7 +63,6 @@ class IotSimulationApp(tk.Tk):
         self.center_pane.add(self.map_container, minsize=400, height=550)
         self._init_map_toolbar()
 
-        # Pass handlers including the new on_wall_drawn
         self.map_view = InteractiveMapView(self.map_container,
                                            on_node_click=self.on_map_node_click,
                                            on_bg_click=self.on_map_bg_click,
@@ -71,6 +73,7 @@ class IotSimulationApp(tk.Tk):
         self.bottom_graphs = BottomAnalysisPanel(self.center_pane)
         self.center_pane.add(self.bottom_graphs, minsize=200, height=250)
 
+        # Right
         self.info_panel = InfoPanel(self.main_pane, self.update_node_settings)
         self.main_pane.add(self.info_panel, minsize=250, width=300)
 
@@ -79,7 +82,6 @@ class IotSimulationApp(tk.Tk):
         toolbar.pack(fill=tk.X, pady=2, padx=5)
         ttk.Label(toolbar, text="Tools:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(0, 5))
 
-        # Mode Switchers
         ttk.Button(toolbar, text="🗺 Normal Map", command=lambda: self.set_map_mode("map")).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="✏️ Draw Walls", command=lambda: self.set_map_mode("draw_wall")).pack(side=tk.LEFT,
                                                                                                        padx=2)
@@ -103,8 +105,55 @@ class IotSimulationApp(tk.Tk):
 
     def on_palette_click(self, node_type):
         self.placement_mode = node_type
-        self.set_map_mode("map")  # Ensure we are on the map
+        self.set_map_mode("map")
         self.info_panel.show_general_info(f"PLACEMENT MODE\n\nClick map to place {node_type}.")
+
+    def on_simulation_type_changed(self, new_type):
+        self.current_experiment = new_type
+        self.info_panel.show_general_info(f"Switched Experiment to:\n{new_type}\n\nResetting simulation state...")
+
+        self.is_running = False
+        self.nodes = []
+        self.walls = []
+
+        is_adhoc = "Ad-Hoc" in new_type
+        self.map_view.set_adhoc_mode(is_adhoc)
+
+        if "E1" in new_type:
+            self.nodes = [
+                {"id": "gw1", "x": 100, "y": 100, "type": "Gateway", "state": "active", "ip": "192.168.1.1",
+                 "strength": 20.0, "battery": 100},
+                {"id": "s1", "x": 80, "y": 80, "type": "Sensor", "state": "sleep", "ip": "192.168.1.101",
+                 "strength": 5.0, "battery": 90},
+            ]
+        elif "Protocol" in new_type:
+            ptype = new_type.split(":")[1].strip()
+            strength = 20.0 if ptype == "Wi-Fi" else (10.0 if ptype == "Zigbee" else 0.0)
+            self.nodes = [
+                {"id": f"{ptype}_GW", "x": 50, "y": 100, "type": "Gateway", "state": "active", "ip": "10.0.0.1",
+                 "strength": strength},
+                {"id": "Node_A", "x": 100, "y": 100, "type": "Sensor", "state": "active", "ip": "10.0.0.2",
+                 "strength": 5.0},
+                {"id": "Node_B", "x": 150, "y": 100, "type": "Sensor", "state": "active", "ip": "10.0.0.3",
+                 "strength": 5.0},
+            ]
+            self.walls = [((120, 50), (120, 150))]
+        elif is_adhoc:
+            self.nodes = [
+                {"id": "Source", "x": 30, "y": 100, "type": "Source Node", "state": "active", "ip": "10.1.1.1",
+                 "strength": 15.0},
+                {"id": "Relay_1", "x": 80, "y": 80, "type": "Ad-Hoc Relay", "state": "active", "ip": "10.1.1.2",
+                 "strength": 15.0},
+                {"id": "Relay_2", "x": 80, "y": 120, "type": "Ad-Hoc Relay", "state": "active", "ip": "10.1.1.3",
+                 "strength": 15.0},
+                {"id": "Sink", "x": 170, "y": 100, "type": "Sink Node", "state": "active", "ip": "10.1.1.4",
+                 "strength": 15.0},
+            ]
+            self.walls = [((120, 0), (120, 150))]
+        else:
+            self._load_mock_scenario()
+
+        self._refresh_view()
 
     def on_map_bg_click(self, x, y):
         if self.placement_mode:
@@ -113,7 +162,8 @@ class IotSimulationApp(tk.Tk):
                 "id": new_id, "x": x, "y": y,
                 "type": self.placement_mode, "state": "active",
                 "ip": f"192.168.1.{len(self.nodes) + 10}",
-                "strength": 20.0, "battery": 100
+                "strength": 20.0 if "Gateway" in self.placement_mode else 10.0,
+                "battery": 100
             }
             self.nodes.append(new_node)
             self.placement_mode = None
@@ -123,7 +173,7 @@ class IotSimulationApp(tk.Tk):
         else:
             self.selected_node_id = None
             self._refresh_view()
-            self.info_panel.show_general_info("Ready.")
+            self.info_panel.show_general_info(f"Experiment: {self.current_experiment}")
 
     def on_map_node_click(self, node_id):
         self.selected_node_id = node_id
@@ -158,11 +208,11 @@ class IotSimulationApp(tk.Tk):
     # --- Sim Control ---
     def run_sim(self):
         self.is_running = True
-        self.info_panel.show_logs(["Sim Running..."])
+        self.info_panel.show_logs([f"Running {self.current_experiment}..."])
 
     def pause_sim(self):
         self.is_running = False
-        self.info_panel.show_logs(["Sim Paused."])
+        self.info_panel.show_logs(["Paused."])
 
     def set_speed(self, val):
         print(f"Speed: {val}")
@@ -179,13 +229,8 @@ class IotSimulationApp(tk.Tk):
             self.broker_queue.append(max(0, min(100, q)))
             self.broker_queue.pop(0)
 
-            # Update Topics
-            self.topic_counts["temp"] += random.randint(0, 2)
-            self.topic_counts["humid"] += random.randint(0, 1)
-
-            # Random Walk
             for n in self.nodes:
-                if n['type'] in ['iPhone', 'Laptop']:
+                if n['type'] in ['iPhone', 'Laptop', 'Ad-Hoc Relay'] and self.is_running:
                     n['x'] += random.uniform(-0.5, 0.5)
                     n['y'] += random.uniform(-0.5, 0.5)
 
@@ -202,12 +247,11 @@ class IotSimulationApp(tk.Tk):
             {"id": "m1", "x": 140, "y": 140, "type": "iPhone", "state": "active", "ip": "192.168.1.102",
              "strength": 10.0, "battery": 45},
         ]
-        # Build a simple box room
         self.walls = [
-            ((70, 20), (70, 180)),  # Vertical Left
-            ((130, 20), (130, 180)),  # Vertical Right
-            ((70, 180), (130, 180)),  # Bottom
-            ((70, 20), (100, 20)),  # Top Part 1
-            ((130, 20), (110, 20)),  # Top Part 2 (Leaving a door gap)
+            ((70, 20), (70, 180)),
+            ((130, 20), (130, 180)),
+            ((70, 180), (130, 180)),
+            ((70, 20), (100, 20)),
+            ((130, 20), (110, 20)),
         ]
         self._refresh_view()
