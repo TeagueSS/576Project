@@ -12,7 +12,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 from ..sim.environment import SimulationEnvironment
 from ..sim.metrics import MetricsCollector
-from ..experiments.scenario_loader import ScenarioLoader
+from ..loader import ScenarioLoader
+from ..radios import load_config
 
 COLORS = {
     "bg": "#f0f2f5",
@@ -47,6 +48,16 @@ class ModernIotApp(tk.Tk):
 
         # PROTOCOL SELECTOR VARIABLE
         self.protocol_var = tk.StringVar(value="Zigbee")
+        
+        # SIMULATION SPEED VARIABLE (1.0 = real-time, higher = faster)
+        self.sim_speed = tk.DoubleVar(value=1.0)
+
+        # Load protocol ranges directly from config files so circles stay accurate
+        self.protocol_ranges = {
+            "zigbee": load_config("zigbee").get("range_m", 30),
+            "ble": load_config("ble").get("range_m", 50),
+            "wifi": load_config("wifi").get("range_m", 120),
+        }
 
         self._build_layout()
         self.reset_simulation()
@@ -128,6 +139,40 @@ class ModernIotApp(tk.Tk):
         proto_cb.pack(side=tk.LEFT, padx=5)
         proto_cb.bind("<<ComboboxSelected>>", lambda e: self.reset_simulation())
 
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(
+            side=tk.LEFT, fill=tk.Y, padx=15
+        )
+
+        # SIMULATION SPEED SLIDER
+        ttk.Label(
+            toolbar,
+            text="SPEED:",
+            background=COLORS["panel_bg"],
+            font=("Segoe UI", 9),
+        ).pack(side=tk.LEFT, padx=(5, 0))
+        
+        self.speed_slider = ttk.Scale(
+            toolbar,
+            from_=0.1,
+            to=10.0,
+            orient=tk.HORIZONTAL,
+            variable=self.sim_speed,
+            length=100,
+        )
+        self.speed_slider.pack(side=tk.LEFT, padx=5)
+        
+        self.lbl_speed = ttk.Label(
+            toolbar,
+            text="1.0x",
+            background=COLORS["panel_bg"],
+            font=("Segoe UI", 9, "bold"),
+            width=5,
+        )
+        self.lbl_speed.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Update speed label when slider moves
+        self.sim_speed.trace_add("write", self._update_speed_label)
+
         self.lbl_broker_status = ttk.Label(
             toolbar,
             text="● BROKER ONLINE",
@@ -201,23 +246,69 @@ class ModernIotApp(tk.Tk):
         self.canvas_h = FigureCanvasTkAgg(self.fig_h, master=t2)
         self.canvas_h.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=10)
 
-        self.inspector = ttk.Frame(sidebar, style="Card.TFrame", padding=15)
-        self.inspector.pack(fill=tk.X, side=tk.BOTTOM)
-        self.lbl_insp = ttk.Label(
-            self.inspector, text="Select a node.", background=COLORS["panel_bg"]
-        )
-        self.lbl_insp.pack(anchor="w", pady=5)
-        self.btn_disc = ttk.Button(
+        # Node Status Table
+        self.inspector = ttk.Frame(sidebar, style="Card.TFrame", padding=10)
+        self.inspector.pack(fill=tk.BOTH, expand=True, side=tk.BOTTOM)
+        
+        ttk.Label(
             self.inspector,
+            text="NODE STATUS",
+            font=("Segoe UI", 10, "bold"),
+            background=COLORS["panel_bg"],
+        ).pack(anchor="w", pady=(0, 5))
+        
+        # Scrollable table frame
+        table_frame = ttk.Frame(self.inspector, style="Card.TFrame")
+        table_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Treeview with columns
+        columns = ("ID", "Type", "State", "Battery")
+        self.node_table = ttk.Treeview(
+            table_frame, columns=columns, show="headings", height=6, selectmode="browse"
+        )
+        
+        # Configure columns
+        self.node_table.heading("ID", text="ID")
+        self.node_table.heading("Type", text="Type")
+        self.node_table.heading("State", text="State")
+        self.node_table.heading("Battery", text="Battery")
+        
+        self.node_table.column("ID", width=80, anchor="w")
+        self.node_table.column("Type", width=60, anchor="center")
+        self.node_table.column("State", width=80, anchor="center")
+        self.node_table.column("Battery", width=60, anchor="center")
+        
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.node_table.yview)
+        self.node_table.configure(yscrollcommand=scrollbar.set)
+        
+        self.node_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Bind selection event
+        self.node_table.bind("<<TreeviewSelect>>", self._on_table_select)
+        
+        # Configure row tags for coloring
+        self.node_table.tag_configure("active", background="#d5f4e6")
+        self.node_table.tag_configure("disconnected", background="#fadbd8")
+        self.node_table.tag_configure("broker_down", background="#fadbd8")
+        self.node_table.tag_configure("dead", background="#d5d8dc")
+        
+        # Action buttons frame
+        btn_frame = ttk.Frame(self.inspector, style="Card.TFrame")
+        btn_frame.pack(fill=tk.X, pady=(8, 0))
+        
+        self.btn_disc = ttk.Button(
+            btn_frame,
             text="Disconnect",
             command=self.disconnect_node,
             state="disabled",
         )
-        self.btn_disc.pack(fill=tk.X)
+        self.btn_disc.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
         self.btn_del = ttk.Button(
-            self.inspector, text="Delete", command=self.delete_node, state="disabled"
+            btn_frame, text="Delete", command=self.delete_node, state="disabled"
         )
-        self.btn_del.pack(fill=tk.X, pady=2)
+        self.btn_del.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
 
     def _make_stat_box(self, p, r, c, t, d):
         f = ttk.Frame(p, style="Card.TFrame", padding=5)
@@ -250,6 +341,11 @@ class ModernIotApp(tk.Tk):
         self.is_running = not self.is_running
         self.btn_run.config(text="⏸ PAUSE" if self.is_running else "▶ RESUME")
 
+    def _update_speed_label(self, *args):
+        """Update the speed display label when slider changes."""
+        speed = self.sim_speed.get()
+        self.lbl_speed.config(text=f"{speed:.1f}x")
+
     def trigger_failover(self):
         if self.loader.broker:
             self.sim_env.env.process(self.loader.broker.failover_sequence(10.0))
@@ -278,25 +374,46 @@ class ModernIotApp(tk.Tk):
                     clicked = n
                     break
             self.selected_node_id = clicked["id"] if clicked else None
-            self._refresh_inspector()
+            
+            # Sync table selection with map click
+            self.node_table.selection_remove(*self.node_table.selection())
+            if self.selected_node_id:
+                for item in self.node_table.get_children():
+                    if self.node_table.item(item)["values"][0] == self.selected_node_id:
+                        self.node_table.selection_set(item)
+                        self.node_table.see(item)
+                        break
+            
+            self._update_buttons()
             self._draw_map()
         else:
             self.loader.add_dynamic_node(self.node_mode.get(), event.xdata, event.ydata)
             self.node_mode.set("Select")
             self.nodes_data = self.loader.get_gui_node_data()
+            self._refresh_inspector()
             self._draw_map()
 
-    def _refresh_inspector(self):
+    def _on_table_select(self, event):
+        """Handle table row selection."""
+        selection = self.node_table.selection()
+        if selection:
+            item = self.node_table.item(selection[0])
+            self.selected_node_id = item["values"][0]
+            self._update_buttons()
+            self._draw_map()
+        else:
+            self.selected_node_id = None
+            self._update_buttons()
+
+    def _update_buttons(self):
+        """Update button states based on selection."""
         if not self.selected_node_id:
-            self.lbl_insp.config(text="No node selected.")
-            self.btn_disc.config(state="disabled")
+            self.btn_disc.config(state="disabled", text="Disconnect")
             self.btn_del.config(state="disabled")
             return
+        
         n = next((x for x in self.nodes_data if x["id"] == self.selected_node_id), None)
         if n:
-            self.lbl_insp.config(
-                text=f"ID: {n['id']}\nProto: {n.get('protocol', 'N/A')}\nState: {n['state']}\nBattery: {n['battery']}%"
-            )
             self.btn_disc.config(
                 state="normal",
                 text="Reconnect" if n["state"] == "disconnected" else "Disconnect",
@@ -304,11 +421,44 @@ class ModernIotApp(tk.Tk):
             self.btn_del.config(state="normal")
         else:
             self.selected_node_id = None
+            self.btn_disc.config(state="disabled", text="Disconnect")
+            self.btn_del.config(state="disabled")
+
+    def _refresh_inspector(self):
+        """Refresh the node status table with current data."""
+        current_selection = self.selected_node_id
+        
+        # Clear existing rows
+        for item in self.node_table.get_children():
+            self.node_table.delete(item)
+        
+        # Populate table with all nodes
+        for n in self.nodes_data:
+            state = n["state"]
+            battery = f"{n['battery']}%"
+            tag = state if state in ("active", "disconnected", "broker_down", "dead") else ""
+            
+            self.node_table.insert(
+                "", "end",
+                values=(n["id"], n["type"], state, battery),
+                tags=(tag,)
+            )
+        
+        # Restore selection if it still exists
+        if current_selection:
+            for item in self.node_table.get_children():
+                if self.node_table.item(item)["values"][0] == current_selection:
+                    self.node_table.selection_set(item)
+                    break
+        
+        self._update_buttons()
 
     def update_loop(self):
         if self.is_running and self.sim_env:
             try:
-                self.sim_env.run(until=self.sim_env.now + 0.5)
+                # Advance simulation by speed-adjusted time step
+                time_step = 0.5 * self.sim_speed.get()
+                self.sim_env.run(until=self.sim_env.now + time_step)
                 self.nodes_data = self.loader.get_gui_node_data()
                 stats = self.metrics.summary()
 
@@ -347,8 +497,8 @@ class ModernIotApp(tk.Tk):
                     self.history["queue"].pop(0)
                     self.history["latency"].pop(0)
 
-                if self.selected_node_id:
-                    self._refresh_inspector()
+                # Always refresh table to show state changes
+                self._refresh_inspector()
                 self._draw_map()
                 self._draw_charts()
             except Exception as e:
@@ -358,9 +508,49 @@ class ModernIotApp(tk.Tk):
 
     def _draw_map(self):
         self.ax_map.clear()
-        self.ax_map.set_xlim(0, 200)
-        self.ax_map.set_ylim(0, 200)
         self.ax_map.axis("off")
+        
+        def _norm_proto(p):
+            """Normalize protocol names (e.g., 'Wi-Fi' -> 'wifi')."""
+            return p.lower().replace("-", "").replace("_", "")
+
+        # Protocol ranges (from config files: zigbee.yaml, ble.yaml, wifi.yaml)
+        PROTOCOL_RANGES = self.protocol_ranges
+
+        # Determine active protocol for view scaling
+        active_proto = _norm_proto(self.protocol_var.get())
+        # Default view and scale
+        xlim = ylim = 200
+        scale_length = 50
+        scale_ticks = [0, 25, 50]
+        if active_proto == "wifi":
+            xlim = ylim = 240  # give extra space for 120m radius
+            scale_length = 100
+            scale_ticks = [0, 50, 100]
+
+        self.ax_map.set_xlim(0, xlim)
+        self.ax_map.set_ylim(0, ylim)
+
+        # Draw scale bar (bottom-left corner)
+        scale_x, scale_y = 10, 12
+        self.ax_map.plot(
+            [scale_x, scale_x + scale_length], [scale_y, scale_y],
+            color=COLORS["header"], linewidth=3, solid_capstyle="butt"
+        )
+        for tick in scale_ticks:
+            self.ax_map.plot(
+                [scale_x + tick, scale_x + tick], [scale_y - 2, scale_y + 2],
+                color=COLORS["header"], linewidth=2
+            )
+            self.ax_map.text(
+                scale_x + tick, scale_y + 5, f"{tick}",
+                fontsize=7, ha="center", color=COLORS["header"]
+            )
+        self.ax_map.text(
+            scale_x + scale_length / 2, scale_y - 8, 
+            "meters",
+            fontsize=8, ha="center", color=COLORS["header"], style="italic"
+        )
 
         gws = [n for n in self.nodes_data if n["type"] == "Gateway"]
         for gw in gws:
@@ -368,15 +558,31 @@ class ModernIotApp(tk.Tk):
                 gw["x"], gw["y"], c=COLORS["accent"], marker="^", s=200, zorder=5
             )
             # Dynamic Circle based on active protocol
-            proto = gw.get("protocol", "zigbee")
-            radius = 40
-            if proto == "wifi":
-                radius = 60
-            elif proto == "ble":
-                radius = 50
+            proto = _norm_proto(gw.get("protocol", "zigbee"))
+            radius = PROTOCOL_RANGES.get(proto, 30)
             self.ax_map.add_patch(
                 matplotlib.patches.Circle(
-                    (gw["x"], gw["y"]), radius, color=COLORS["accent"], alpha=0.1
+                    (gw["x"], gw["y"]), radius, color=COLORS["accent"], alpha=0.08,
+                    linestyle="--", linewidth=0.5, fill=True
+                )
+            )
+
+        # Draw range circles for all non-gateway nodes (very light)
+        others = [n for n in self.nodes_data if n["type"] != "Gateway"]
+        for n in others:
+            proto = _norm_proto(n.get("protocol", "zigbee"))
+            radius = PROTOCOL_RANGES.get(proto, 30)
+            # Color based on state - green for active, red for disconnected
+            if n["state"] == "active":
+                circle_color = COLORS["success"]
+            else:
+                circle_color = COLORS["danger"]
+            
+            self.ax_map.add_patch(
+                matplotlib.patches.Circle(
+                    (n["x"], n["y"]), radius, 
+                    color=circle_color, alpha=0.05,
+                    linestyle=":", linewidth=0.5, fill=True, zorder=1
                 )
             )
 
@@ -398,7 +604,7 @@ class ModernIotApp(tk.Tk):
                         zorder=2,
                     )
 
-        others = [n for n in self.nodes_data if n["type"] != "Gateway"]
+        # Draw node markers
         if others:
             colors = [
                 COLORS["success"] if n["state"] == "active" else COLORS["danger"]

@@ -24,11 +24,20 @@ class MqttClient:
                 yield self.env.timeout(1.0)
                 continue
 
-            # 2. Connection Handling
+            # 2. Broker Health Check - detect failover
+            if not self.broker.is_alive:
+                self.connected = False
+                # Update node visual state to show disconnection (turns red)
+                if self.node.state == "active":
+                    self.node.state = "broker_down"
+                yield self.env.timeout(0.5)
+                continue
+
+            # 3. Connection Handling
             if not self.connected:
                 yield self.env.process(self.attempt_connect())
 
-            # 3. Message Processing
+            # 4. Message Processing
             if self.connected and self.msg_queue:
                 msg = self.msg_queue.pop(0)
                 yield self.env.process(self.send_publish(msg))
@@ -57,6 +66,9 @@ class MqttClient:
         if success:
             self.connected = True
             self.backoff = 1.0
+            # Restore node visual state on successful reconnect (turns green)
+            if self.node.state in ("broker_down", "disconnected"):
+                self.node.state = "active"
         else:
             wait = self.backoff + random.uniform(0, 1)
             yield self.env.timeout(wait)

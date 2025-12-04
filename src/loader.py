@@ -1,31 +1,30 @@
-import simpy
 import random
-from ..devices.sensor_node import SensorNode
-from ..mqtt.broker import MqttBroker
-from ..mobility.random_waypoint import RandomWaypoint
+from .devices.sensor_node import SensorNode
+from .mqtt.broker import MqttBroker
+from .mobility.random_waypoint import RandomWaypoint
 
 
 class ScenarioLoader:
+    """
+    Lightweight replacement for the removed experiments/ folder.
+    Provides basic topology setup and GUI node data.
+    """
+
     def __init__(self, env, metrics):
         self.env = env
         self.metrics = metrics
         self.nodes = []
         self.broker = MqttBroker(env, metrics)
         self.gw_pos = (100, 100)
-
-        # NEW: Global setting for the current experiment
         self.active_protocol = "zigbee"
 
-        # Create Sink
-        self.sink_client = SinkSubscriber(env, self.broker)
-
     def load_experiment(self, protocol_mode="zigbee"):
-        """Resets and loads a fresh scenario with the specific protocol."""
+        """Set up a basic topology with the chosen protocol."""
         self.nodes = []
-        self.active_protocol = protocol_mode.lower()  # ble, wifi, or zigbee
+        self.active_protocol = protocol_mode.lower()
         self.gw_pos = (100, 100)
 
-        # Default Topology
+        # Default topology: one gateway, two sensors, one mobile
         self.add_dynamic_node("Gateway", 100, 100)
         self.add_dynamic_node("Sensor", 80, 80)
         self.add_dynamic_node("Sensor", 120, 120)
@@ -35,19 +34,9 @@ class ScenarioLoader:
         clean_type = node_type.replace("Add ", "").split()[0]
         new_id = f"{clean_type[:3]}_{random.randint(100, 999)}"
 
-        # --- PROTOCOL SELECTION LOGIC ---
-        # Gateways always need to support the active protocol + Backhaul
-        # Mobiles/Sensors use the Active Protocol (for E2 comparison)
+        # All nodes use the active protocol
+        radio = self.active_protocol
 
-        if clean_type == "Gateway":
-            # Gateway effectively acts as the radio hub for the chosen protocol
-            radio = self.active_protocol
-        elif clean_type == "Mobile" or clean_type == "iPhone":
-            radio = self.active_protocol
-        else:
-            radio = self.active_protocol
-
-        # Create Node
         node = SensorNode(
             self.env, new_id, (x, y), radio, self.broker, lambda: self.gw_pos
         )
@@ -60,7 +49,7 @@ class ScenarioLoader:
         return node
 
     def remove_node(self, node_id):
-        for n in self.nodes:
+        for n in list(self.nodes):
             if n.id == node_id:
                 n.stop()
                 self.nodes.remove(n)
@@ -87,8 +76,15 @@ class ScenarioLoader:
                     "state": n.state,
                     "ip": "10.0.0.1",
                     "battery": int(max(0, (n.battery_j / 1000.0) * 100)),
-                    # Pass the protocol to GUI so it knows how big to draw the circle
                     "protocol": self.active_protocol,
+                    # Connection info (for map lines)
+                    "mqtt_connected": getattr(n.mqtt, "connected", False),
+                    "in_range": n.mqtt.radio.can_reach(n.get_distance_to_gateway())
+                    if hasattr(n, "mqtt")
+                    else True,
+                    "distance": n.get_distance_to_gateway()
+                    if hasattr(n, "get_distance_to_gateway")
+                    else 0,
                 }
             )
         return data
@@ -107,3 +103,4 @@ class SinkSubscriber:
 
     def on_message(self, msg):
         pass
+
