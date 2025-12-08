@@ -9,11 +9,12 @@ class NodeTable(ttk.Frame):
         ttk.Label(self, text="Node Status List", style="CardHeader.TLabel").pack(anchor="w", pady=(0, 10))
 
         # Define columns
-        columns = ("id", "type", "state", "battery", "retries", "wait")
+        columns = ("id", "ip", "type", "state", "battery", "retries", "wait")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=10, selectmode="browse")
 
         # Configure Column Headings
         self.tree.heading("id", text="ID")
+        self.tree.heading("ip", text="IP")
         self.tree.heading("type", text="Type")
         self.tree.heading("state", text="State")
         self.tree.heading("battery", text="Batt")
@@ -22,6 +23,7 @@ class NodeTable(ttk.Frame):
 
         # Configure Column Widths (Adjust as needed)
         self.tree.column("id", width=60, anchor="w")
+        self.tree.column("ip", width=110, anchor="w")
         self.tree.column("type", width=70, anchor="w")
         self.tree.column("state", width=70, anchor="center")
         self.tree.column("battery", width=40, anchor="e")
@@ -64,6 +66,7 @@ class NodeTable(ttk.Frame):
 
             self.tree.insert("", tk.END, values=(
                 n['id'],
+                n.get('ip', 'n/a'),
                 n['type'],
                 n['state'].capitalize(),
                 f"{n['battery']}%",

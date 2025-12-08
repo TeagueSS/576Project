@@ -1,0 +1,180 @@
+{
+  "timestamp": "20251207-220522",
+  "sim_time": 5.200000000000002,
+  "run_meta": {
+    "selected_tool": "Select",
+    "sim_speed": 1.0,
+    "seed": 0
+  },
+  "protocol": "zigbee",
+  "gateway_position": [
+    250,
+    250
+  ],
+  "failover_info": {
+    "last_start": null,
+    "last_end": null
+  },
+  "summary": {
+    "delivery_ratio": 1.0,
+    "avg_latency": 0.04327397867188002,
+    "duplicates": 0,
+    "total_energy_j": 0.65049504
+  },
+  "topic_rates_msgs_per_sec": {
+    "sensors/humidity": 0.6666666666666666
+  },
+  "topic_publish_counts": {
+    "sensors/humidity": 3
+  },
+  "topic_delivery_stats": {
+    "sensors/humidity": {
+      "delivered": 3,
+      "avg_latency": 0.04327397867188002
+    }
+  },
+  "queue_depth_history": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0
+  ],
+  "nodes": [
+    {
+      "id": "Gate_975",
+      "x": 250,
+      "y": 250,
+      "type": "Gateway",
+      "state": "active",
+      "battery": 100,
+      "protocol": "zigbee",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 3,
+      "next_retry": 4.0,
+      "ip": "10.0.0.10",
+      "energy_j": 0.0
+    },
+    {
+      "id": "iPho_491",
+      "x": 164.68085106382972,
+      "y": 240.0,
+      "type": "Sensor",
+      "state": "scanning",
+      "battery": 99,
+      "protocol": "zigbee",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 3,
+      "next_retry": 4.0,
+      "ip": "10.0.0.11",
+      "energy_j": 0.1
+    },
+    {
+      "id": "Lapt_844",
+      "x": 350,
+      "y": 250,
+      "type": "Sensor",
+      "state": "scanning",
+      "battery": 99,
+      "protocol": "zigbee",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 3,
+      "next_retry": 4.0,
+      "ip": "10.0.0.12",
+      "energy_j": 0.15000000000000002
+    },
+    {
+      "id": "iPho_606",
+      "x": 373.868613138686,
+      "y": 140.0,
+      "type": "Sensor",
+      "state": "scanning",
+      "battery": 99,
+      "protocol": "zigbee",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 3,
+      "next_retry": 4.0,
+      "ip": "10.0.0.13",
+      "energy_j": 0.1
+    },
+    {
+      "id": "Sens_214",
+      "x": 293.5267857142857,
+      "y": 289.52879581151836,
+      "type": "Sensor",
+      "state": "scanning",
+      "battery": 99,
+      "protocol": "zigbee",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 3,
+      "next_retry": 4.0,
+      "ip": "10.0.0.14",
+      "energy_j": 0.15000000000000002
+    },
+    {
+      "id": "Sens_685",
+      "x": 233.25892857142858,
+      "y": 229.31937172774875,
+      "type": "Sensor",
+      "state": "active",
+      "battery": 99,
+      "protocol": "zigbee",
+      "mqtt_connected": true,
+      "parent_id": "Gate_975",
+      "retries": 0,
+      "next_retry": 0.0,
+      "ip": "10.0.0.15",
+      "energy_j": 0.15049504000000002
+    }
+  ]
+}

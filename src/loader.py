@@ -40,6 +40,7 @@ class ScenarioLoader:
         self.cloud_broker_proxy = WanBrokerProxy(self.broker, self.wan_link)
         self.gw_pos = (250, 250)
         self.active_protocol = "zigbee"
+        self.next_ip_host = 10
         self.sink = SinkSubscriber(env, self.broker)
 
     def _get_network_nodes(self):
@@ -49,6 +50,7 @@ class ScenarioLoader:
         self.nodes = []
         sel = selection_str.lower()
         self.gw_pos = (250, 250)
+        self.next_ip_host = 10
 
         if "wifi" in sel or "wi-fi" in sel:
             self.active_protocol = "wifi"
@@ -116,6 +118,11 @@ class ScenarioLoader:
         self.add_dynamic_node("Ad-Hoc Relay", 200, 250)
         self.add_dynamic_node("Sink Node", 250, 250)
 
+    def _alloc_ip(self):
+        ip = f"10.0.0.{self.next_ip_host}"
+        self.next_ip_host += 1
+        return ip
+
     def load_from_snapshot(self, json_path: str):
         """Rebuild a scenario from a saved JSON snapshot."""
         with open(json_path, "r", encoding="utf-8") as f:
@@ -124,6 +131,7 @@ class ScenarioLoader:
         self.nodes = []
         self.active_protocol = data.get("protocol", self.active_protocol)
         self.gw_pos = tuple(data.get("gateway_position", self.gw_pos))
+        self.next_ip_host = 10
 
         node_entries = data.get("nodes", [])
 
@@ -134,7 +142,13 @@ class ScenarioLoader:
         for n in gateways + others:
             ntype = n.get("type", "Sensor")
             is_mobile = ntype in ["iPhone", "Mobile", "Wearable", "Asset Tag"]
-            node = self.add_dynamic_node(ntype, n.get("x", 0), n.get("y", 0), is_mobile=is_mobile)
+            node = self.add_dynamic_node(
+                ntype,
+                n.get("x", 0),
+                n.get("y", 0),
+                is_mobile=is_mobile,
+                ip=n.get("ip")
+            )
             node.state = n.get("state", node.state)
             # Roughly map battery % back to joules (assuming 100% = 1000 J)
             batt_pct = n.get("battery", 100)
@@ -146,13 +160,14 @@ class ScenarioLoader:
             if hasattr(node, "connected_parent_id"):
                 node.connected_parent_id = n.get("parent_id")
 
-    def add_dynamic_node(self, node_type, x, y, is_mobile=False):
+    def add_dynamic_node(self, node_type, x, y, is_mobile=False, ip=None):
         clean_type = node_type.replace("Add ", "").split()[0]
         if clean_type in ["iPhone", "Mobile", "Wearable", "Asset Tag"]:
             is_mobile = True
 
         new_id = f"{clean_type[:4]}_{random.randint(100, 999)}"
         radio = self.active_protocol
+        ip_addr = ip or self._alloc_ip()
 
         if "Gateway" in clean_type:
             node = Gateway(self.env, new_id, (x, y), self.cloud_broker_proxy, self._get_network_nodes)
@@ -160,6 +175,8 @@ class ScenarioLoader:
             node.is_gateway = True
         else:
             node = SensorNode(self.env, new_id, (x, y), radio, self.broker, self._get_network_nodes)
+
+        node.ip = ip_addr
 
         if is_mobile:
             node.is_mobile = True
@@ -240,7 +257,8 @@ class ScenarioLoader:
                 "mqtt_connected": connected,
                 "parent_id": parent,
                 "retries": retries,
-                "next_retry": next_retry
+                "next_retry": next_retry,
+                "ip": getattr(n, "ip", "n/a"),
             })
         return data
 
