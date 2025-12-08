@@ -48,7 +48,7 @@ class ModernIotApp(tk.Tk):
 
         # PROTOCOL SELECTOR VARIABLE
         self.protocol_var = tk.StringVar(value="Zigbee")
-        
+
         # SIMULATION SPEED VARIABLE (1.0 = real-time, higher = faster)
         self.sim_speed = tk.DoubleVar(value=1.0)
 
@@ -150,7 +150,7 @@ class ModernIotApp(tk.Tk):
             background=COLORS["panel_bg"],
             font=("Segoe UI", 9),
         ).pack(side=tk.LEFT, padx=(5, 0))
-        
+
         self.speed_slider = ttk.Scale(
             toolbar,
             from_=0.1,
@@ -160,7 +160,7 @@ class ModernIotApp(tk.Tk):
             length=100,
         )
         self.speed_slider.pack(side=tk.LEFT, padx=5)
-        
+
         self.lbl_speed = ttk.Label(
             toolbar,
             text="1.0x",
@@ -169,7 +169,7 @@ class ModernIotApp(tk.Tk):
             width=5,
         )
         self.lbl_speed.pack(side=tk.LEFT, padx=(0, 10))
-        
+
         # Update speed label when slider moves
         self.sim_speed.trace_add("write", self._update_speed_label)
 
@@ -249,55 +249,55 @@ class ModernIotApp(tk.Tk):
         # Node Status Table
         self.inspector = ttk.Frame(sidebar, style="Card.TFrame", padding=10)
         self.inspector.pack(fill=tk.BOTH, expand=True, side=tk.BOTTOM)
-        
+
         ttk.Label(
             self.inspector,
             text="NODE STATUS",
             font=("Segoe UI", 10, "bold"),
             background=COLORS["panel_bg"],
         ).pack(anchor="w", pady=(0, 5))
-        
+
         # Scrollable table frame
         table_frame = ttk.Frame(self.inspector, style="Card.TFrame")
         table_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # Treeview with columns
         columns = ("ID", "Type", "State", "Battery")
         self.node_table = ttk.Treeview(
             table_frame, columns=columns, show="headings", height=6, selectmode="browse"
         )
-        
+
         # Configure columns
         self.node_table.heading("ID", text="ID")
         self.node_table.heading("Type", text="Type")
         self.node_table.heading("State", text="State")
         self.node_table.heading("Battery", text="Battery")
-        
+
         self.node_table.column("ID", width=80, anchor="w")
         self.node_table.column("Type", width=60, anchor="center")
         self.node_table.column("State", width=80, anchor="center")
         self.node_table.column("Battery", width=60, anchor="center")
-        
+
         # Scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.node_table.yview)
         self.node_table.configure(yscrollcommand=scrollbar.set)
-        
+
         self.node_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         # Bind selection event
         self.node_table.bind("<<TreeviewSelect>>", self._on_table_select)
-        
+
         # Configure row tags for coloring
         self.node_table.tag_configure("active", background="#d5f4e6")
         self.node_table.tag_configure("disconnected", background="#fadbd8")
         self.node_table.tag_configure("broker_down", background="#fadbd8")
         self.node_table.tag_configure("dead", background="#d5d8dc")
-        
+
         # Action buttons frame
         btn_frame = ttk.Frame(self.inspector, style="Card.TFrame")
         btn_frame.pack(fill=tk.X, pady=(8, 0))
-        
+
         self.btn_disc = ttk.Button(
             btn_frame,
             text="Disconnect",
@@ -374,7 +374,7 @@ class ModernIotApp(tk.Tk):
                     clicked = n
                     break
             self.selected_node_id = clicked["id"] if clicked else None
-            
+
             # Sync table selection with map click
             self.node_table.selection_remove(*self.node_table.selection())
             if self.selected_node_id:
@@ -383,7 +383,7 @@ class ModernIotApp(tk.Tk):
                         self.node_table.selection_set(item)
                         self.node_table.see(item)
                         break
-            
+
             self._update_buttons()
             self._draw_map()
         else:
@@ -411,7 +411,7 @@ class ModernIotApp(tk.Tk):
             self.btn_disc.config(state="disabled", text="Disconnect")
             self.btn_del.config(state="disabled")
             return
-        
+
         n = next((x for x in self.nodes_data if x["id"] == self.selected_node_id), None)
         if n:
             self.btn_disc.config(
@@ -427,30 +427,30 @@ class ModernIotApp(tk.Tk):
     def _refresh_inspector(self):
         """Refresh the node status table with current data."""
         current_selection = self.selected_node_id
-        
+
         # Clear existing rows
         for item in self.node_table.get_children():
             self.node_table.delete(item)
-        
+
         # Populate table with all nodes
         for n in self.nodes_data:
             state = n["state"]
             battery = f"{n['battery']}%"
             tag = state if state in ("active", "disconnected", "broker_down", "dead") else ""
-            
+
             self.node_table.insert(
                 "", "end",
                 values=(n["id"], n["type"], state, battery),
                 tags=(tag,)
             )
-        
+
         # Restore selection if it still exists
         if current_selection:
             for item in self.node_table.get_children():
                 if self.node_table.item(item)["values"][0] == current_selection:
                     self.node_table.selection_set(item)
                     break
-        
+
         self._update_buttons()
 
     def update_loop(self):
@@ -509,7 +509,7 @@ class ModernIotApp(tk.Tk):
     def _draw_map(self):
         self.ax_map.clear()
         self.ax_map.axis("off")
-        
+
         def _norm_proto(p):
             """Normalize protocol names (e.g., 'Wi-Fi' -> 'wifi')."""
             return p.lower().replace("-", "").replace("_", "")
@@ -547,7 +547,7 @@ class ModernIotApp(tk.Tk):
                 fontsize=7, ha="center", color=COLORS["header"]
             )
         self.ax_map.text(
-            scale_x + scale_length / 2, scale_y - 8, 
+            scale_x + scale_length / 2, scale_y - 8,
             "meters",
             fontsize=8, ha="center", color=COLORS["header"], style="italic"
         )
@@ -577,10 +577,10 @@ class ModernIotApp(tk.Tk):
                 circle_color = COLORS["success"]
             else:
                 circle_color = COLORS["danger"]
-            
+
             self.ax_map.add_patch(
                 matplotlib.patches.Circle(
-                    (n["x"], n["y"]), radius, 
+                    (n["x"], n["y"]), radius,
                     color=circle_color, alpha=0.05,
                     linestyle=":", linewidth=0.5, fill=True, zorder=1
                 )
@@ -603,6 +603,48 @@ class ModernIotApp(tk.Tk):
                         alpha=0.7,
                         zorder=2,
                     )
+
+                    # ---------------------------------------------------------------
+                    # ZIGBEE MESH VISUALIZATION (node-to-node communication lines)
+                    # ---------------------------------------------------------------
+                    def _norm_proto(p):
+                        return str(p).lower().replace("-", "").replace("_", "")
+
+                    # Only show mesh if the protocol is Zigbee
+                    active_proto = _norm_proto(self.protocol_var.get())
+                    if active_proto == "zigbee":
+
+                        # Zigbee range (from config)
+                        zigbee_range = self.protocol_ranges.get("zigbee", 30)
+
+                        # Build a map of node objects that are NOT gateways
+                        node_by_id = {n["id"]: n for n in self.nodes_data if n["type"] != "Gateway"}
+
+                        # Active nodes recently published
+                        active_node_ids = [nid for nid in active_ids if nid in node_by_id]
+
+                        # Draw purple dotted lines between nodes that are within ZigBee range
+                        for src_id in active_node_ids:
+                            sx, sy = node_by_id[src_id]["x"], node_by_id[src_id]["y"]
+
+                            for dst_id, dst in node_by_id.items():
+                                if src_id == dst_id:
+                                    continue
+
+                                dx = dst["x"] - sx
+                                dy = dst["y"] - sy
+                                dist = (dx * dx + dy * dy) ** 0.5
+
+                                if dist <= zigbee_range:
+                                    self.ax_map.plot(
+                                        [sx, dst["x"]],
+                                        [sy, dst["y"]],
+                                        linestyle=":",
+                                        linewidth=1.0,
+                                        color="#9b59b6",  # purple
+                                        alpha=0.6,
+                                        zorder=1,
+                                    )
 
         # Draw node markers
         if others:
