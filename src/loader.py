@@ -177,13 +177,18 @@ class ScenarioLoader:
 
             connected = False
             parent = None
+            retries = 0
+            next_retry = 0.0
+
             if hasattr(n, "mqtt"):
                 connected = n.mqtt.connected
                 parent = n.connected_parent_id
+                # <--- EXTRACT STATS --->
+                if not connected:
+                    retries = getattr(n.mqtt, 'retry_count', 0)
+                    next_retry = getattr(n.mqtt, 'backoff', 0.0)
 
             # Color Logic:
-            # Gateway: Green if it has kids, Red if idle
-            # Sensor: Green if connected, Red if scanning
             visual_state = n.state
             if ntype == "Gateway":
                 visual_state = "active" if parent_map.get(n.id, 0) > 0 else "scanning"
@@ -201,7 +206,9 @@ class ScenarioLoader:
                 "id": n.id, "x": n.x, "y": n.y, "type": ntype, "state": visual_state,
                 "battery": batt, "protocol": self.active_protocol,
                 "mqtt_connected": connected,
-                "parent_id": parent
+                "parent_id": parent,
+                "retries": retries,
+                "next_retry": next_retry
             })
         return data
 

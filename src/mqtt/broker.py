@@ -23,7 +23,12 @@ class MqttBroker:
         self.is_alive = False
         print(f"[{self.env.now:.2f}] !!! BROKER CRASH !!!")
 
-        # Disconnect everyone visually
+        # NEW: Force disconnect everyone (Simulate TCP Reset)
+        # This forces clients to notice the failure and start retrying
+        for client in self.connected_clients.values():
+            client.connected = False
+
+        # Clear the broker's own list
         self.connected_clients = {}
 
         yield self.env.timeout(downtime_s)
@@ -99,8 +104,6 @@ class MqttBroker:
                 self.env.process(self._deliver_msg(sub_id, msg))
             else:
                 # OFFLINE HANDLING
-                # We queue for everyone, but if they connect with clean_session=True later,
-                # this queue gets wiped. If clean_session=False, they get it.
                 if sub_id not in self.client_queues:
                     self.client_queues[sub_id] = []
                 self.client_queues[sub_id].append(msg)

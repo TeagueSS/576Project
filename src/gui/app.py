@@ -15,6 +15,7 @@ from .views.stats_panel import StatsPanel
 from .views.palette import NodePalette
 from .views.queue_sparkline import QueueSparkline
 from .views.topic_heatmap import TopicHeatmap
+from .views.node_table import NodeTable  # <--- Added Import
 
 COLORS = {"bg": "#E3E9EE", "panel_bg": "#FFFFFF", "header_bg": "#2C3E50", "text_primary": "#2C3E50",
           "primary": "#3498DB", "danger": "#E74C3C"}
@@ -104,6 +105,11 @@ class ModernIotApp(tk.Tk):
 
         self.stats_panel = StatsPanel(sidebar)
         self.stats_panel.pack(fill=tk.X, pady=(0, 15))
+
+        # <--- Added NodeTable to Sidebar --->
+        self.node_table = NodeTable(sidebar)
+        self.node_table.pack(fill=tk.X, pady=(0, 15))
+
         self.palette = NodePalette(sidebar, on_node_type_selected=self.on_tool_changed,
                                    on_simulation_type_changed=self.on_experiment_changed)
         self.palette.pack(fill=tk.X, pady=(0, 15))
@@ -165,6 +171,11 @@ class ModernIotApp(tk.Tk):
         current_sel = self.info_panel.current_node['id'] if self.info_panel.current_node else None
         self.map_view.update_state(nodes, [], current_sel, [], {})
         self.stats_panel.update_metrics(self.metrics)
+
+        # <--- Update NodeTable with fresh data --->
+        if hasattr(self, 'node_table'):
+            self.node_table.update_table(nodes)
+
         broker_q = sum([len(q) for q in self.loader.broker.client_queues.values()])
         self.history["queue"].append(broker_q)
         if len(self.history["queue"]) > 50: self.history["queue"].pop(0)
@@ -184,7 +195,6 @@ class ModernIotApp(tk.Tk):
         if node_data:
             real_node = self.loader.get_node(node_id)
             if real_node:
-                # FIX: Typo fixed (n_data -> node_data)
                 node_data['range'] = real_node.radio.config.get('range_m', 50)
             self.info_panel.show_node_details(node_data)
             self.map_view.selected_node_id = node_id
