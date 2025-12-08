@@ -1,54 +1,77 @@
 import simpy
 import random
+import math
 from ..radios import create_radio
 from ..mqtt.client import MqttClient
 
 
 class SensorNode:
-    def __init__(self, env, node_id, pos, radio_type, broker, gateway_lookup_fn):
+    def __init__(self, env, node_id, pos, radio_type, broker, network_lookup_fn):
         self.env = env
         self.id = node_id
         self.x, self.y = pos
-        self.gateway_lookup = gateway_lookup_fn
+        self.network_lookup_fn = network_lookup_fn
 
         self.radio = create_radio(radio_type, env)
         self.mqtt = MqttClient(env, node_id, broker, self.radio, self)
 
         self.battery_j = 1000.0
-        self.state = "active"
+        self.state = "scanning"
         self.active = True
+        self.connected_parent_id = None
 
-        # Determine topics
         self.topic_root = "sensors"
         if "iPhone" in node_id or "Mobile" in node_id:
             self.topic_root = "mobile"
+        elif "Laptop" in node_id:
+            self.topic_root = "workstation"
 
         self.process = self.env.process(self.app_loop())
 
-    def get_distance_to_gateway(self):
-        gx, gy = self.gateway_lookup()
-        import math
+    def get_network_link(self):
+        all_nodes = self.network_lookup_fn()
 
-        return math.hypot(self.x - gx, self.y - gy)
+        # Heuristic: Mesh if range is short (<100m)
+        is_mesh = False
+        if isinstance(self.radio.config.get('range_m'), (int, float)):
+            if self.radio.config['range_m'] < 100: is_mesh = True
+
+        candidates = []
+        for n in all_nodes:
+            if n.id == self.id: continue
+
+            dist = math.hypot(self.x - n.x, self.y - n.y)
+            if not self.radio.can_reach(dist): continue
+
+            # Robust Gateway Check (Partial string match)
+            if "Gate" in n.id or getattr(n, "is_gateway", False):
+                candidates.append((dist, n.id))
+            # Mesh Check: Connect to active sensors if in mesh mode
+            elif is_mesh and n.state == "active" and n.active:
+                candidates.append((dist, n.id))
+
+        if not candidates: return None
+        # Connect to closest valid parent
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0]
 
     def consume_energy(self, joules):
         self.battery_j -= joules
-        # CRITICAL FIX: Report this to the global metrics collector
-        # Access path: self.mqtt -> broker -> metrics
-        if self.mqtt.broker and self.mqtt.broker.metrics:
-            self.mqtt.broker.metrics.record_energy(self.id, joules)
-
+        if self.mqtt.broker and hasattr(self.mqtt.broker, 'metrics'):
+            metrics = getattr(self.mqtt.broker, 'metrics', None)
+            if metrics: metrics.record_energy(self.id, joules)
         if self.battery_j <= 0:
             self.state = "dead"
             self.active = False
 
     def toggle_connection(self):
         if self.state == "disconnected":
-            self.state = "active"
-            self.mqtt.connected = True  # Force client state
+            self.state = "scanning"
+            self.mqtt.connected = False
         else:
             self.state = "disconnected"
             self.mqtt.connected = False
+            self.connected_parent_id = None
 
     def stop(self):
         self.active = False
@@ -61,21 +84,17 @@ class SensorNode:
                 yield self.env.timeout(1.0)
                 continue
 
-            # 1. Report Energy (Idle/Sleep)
             self.consume_energy(0.05)
 
-            # 2. Publish
             if self.mqtt.connected:
-                # Varied topics for Heatmap
+                topic = "unknown"
                 if self.topic_root == "mobile":
-                    topic = random.choice(["mobile/gps", "mobile/app_data"])
+                    topic = random.choice(["mobile/gps", "mobile/status"])
+                elif self.topic_root == "workstation":
+                    topic = random.choice(["work/file_sync", "work/email"])
                 else:
-                    topic = random.choice(
-                        ["sensors/temp", "sensors/humid", "sensors/battery"]
-                    )
+                    topic = random.choice(["sensors/temp", "sensors/humidity"])
 
-                payload = 20 + random.uniform(-5, 5)
-                # This triggers record_publish -> sink triggers record_delivery
-                self.mqtt.publish(topic, payload, qos=1)
+                self.mqtt.publish(topic, 25.0, qos=1)
 
-            yield self.env.timeout(random.uniform(0.5, 2.0))
+            yield self.env.timeout(random.uniform(0.8, 2.5))

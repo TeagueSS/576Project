@@ -15,12 +15,17 @@ class MqttBroker:
         # Map: client_id -> queue of messages (Persistent sessions)
         self.client_queues = {}
 
+        # Clients currently online: client_id -> client_instance
         self.connected_clients = {}
 
     def failover_sequence(self, downtime_s):
         """Simulate a crash and reboot."""
         self.is_alive = False
         print(f"[{self.env.now:.2f}] !!! BROKER CRASH !!!")
+
+        # Disconnect everyone visually
+        self.connected_clients = {}
+
         yield self.env.timeout(downtime_s)
         self.is_alive = True
         print(f"[{self.env.now:.2f}] ... BROKER RECOVERED ...")
@@ -29,18 +34,36 @@ class MqttBroker:
         if not self.is_alive:
             return False
 
+        # ACK Latency
         yield self.env.timeout(random.uniform(0.01, 0.05))
 
         self.connected_clients[client_id] = client_instance
 
-        if clean_session or client_id not in self.client_queues:
+        # SESSION MANAGEMENT
+        if clean_session:
+            # Wipe any previous state
             self.client_queues[client_id] = []
         else:
-            # Deliver queued messages
-            for msg in list(self.client_queues[client_id]):
-                self.env.process(self._deliver_msg(client_id, msg))
-            self.client_queues[client_id] = []
+            # Persistent Session: Restore queue if it exists
+            if client_id not in self.client_queues:
+                self.client_queues[client_id] = []
 
+            # Deliver all queued messages immediately
+            queue_len = len(self.client_queues[client_id])
+            if queue_len > 0:
+                print(f"[{self.env.now:.2f}] Broker delivering {queue_len} offline msgs to {client_id}")
+                for msg in list(self.client_queues[client_id]):
+                    self.env.process(self._deliver_msg(client_id, msg))
+                self.client_queues[client_id] = []
+
+        return True
+
+    def ping(self, client_id):
+        """Handle PINGREQ from client."""
+        if not self.is_alive:
+            return False
+        # PINGRESP is just an ACK
+        yield self.env.timeout(random.uniform(0.005, 0.01))
         return True
 
     def publish(self, sender_id, topic, payload, qos=0, retain=False):
@@ -48,7 +71,7 @@ class MqttBroker:
             return False
 
         # 1. Record Publish Metric
-        msg_id = f"{sender_id}_{self.env.now}_{random.randint(0,9999)}"
+        msg_id = f"{sender_id}_{self.env.now}_{random.randint(0, 9999)}"
         self.metrics.record_publish(
             msg_id,
             topic=topic,
@@ -75,7 +98,9 @@ class MqttBroker:
             if sub_id in self.connected_clients:
                 self.env.process(self._deliver_msg(sub_id, msg))
             else:
-                # Store if persistent
+                # OFFLINE HANDLING
+                # We queue for everyone, but if they connect with clean_session=True later,
+                # this queue gets wiped. If clean_session=False, they get it.
                 if sub_id not in self.client_queues:
                     self.client_queues[sub_id] = []
                 self.client_queues[sub_id].append(msg)
@@ -108,6 +133,7 @@ class MqttBroker:
 
     def _deliver_msg(self, client_id, msg):
         yield self.env.timeout(random.uniform(0.01, 0.05))
+        # Verify client is still connected before sending
         if client_id in self.connected_clients:
             self.connected_clients[client_id].on_message(msg)
             # CRITICAL: This updates the metrics!
@@ -121,5 +147,4 @@ class MqttBroker:
             return True
         if sub_filter == topic:
             return True
-        # (Can add '+' support here if needed, but '#' covers our Sink)
         return False

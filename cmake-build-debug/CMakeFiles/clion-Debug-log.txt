@@ -1,0 +1,7 @@
+/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja -G Ninja -S /Users/teaguesangster/Code/Python/CS576/576Project -B /Users/teaguesangster/Code/Python/CS576/576Project/cmake-build-debug
+-- ns-3 root: /Users/teaguesangster/ns-3-dev
+-- Test scripts: /Users/teaguesangster/Code/Python/CS576/576Project/simulation/test-scripts
+-- Custom modules: /Users/teaguesangster/Code/Python/CS576/576Project/simulation/custom-modules
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/teaguesangster/Code/Python/CS576/576Project/cmake-build-debug
