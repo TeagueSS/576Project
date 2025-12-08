@@ -1,5 +1,6 @@
 import random
 import math
+import json
 from .devices.sensor_node import SensorNode
 from .devices.gateway import Gateway
 from .mqtt.broker import MqttBroker
@@ -114,6 +115,36 @@ class ScenarioLoader:
         self.add_dynamic_node("Ad-Hoc Relay", 150, 250)
         self.add_dynamic_node("Ad-Hoc Relay", 200, 250)
         self.add_dynamic_node("Sink Node", 250, 250)
+
+    def load_from_snapshot(self, json_path: str):
+        """Rebuild a scenario from a saved JSON snapshot."""
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.nodes = []
+        self.active_protocol = data.get("protocol", self.active_protocol)
+        self.gw_pos = tuple(data.get("gateway_position", self.gw_pos))
+
+        node_entries = data.get("nodes", [])
+
+        # Add gateways first so parent links resolve
+        gateways = [n for n in node_entries if n.get("type") == "Gateway"]
+        others = [n for n in node_entries if n.get("type") != "Gateway"]
+
+        for n in gateways + others:
+            ntype = n.get("type", "Sensor")
+            is_mobile = ntype in ["iPhone", "Mobile", "Wearable", "Asset Tag"]
+            node = self.add_dynamic_node(ntype, n.get("x", 0), n.get("y", 0), is_mobile=is_mobile)
+            node.state = n.get("state", node.state)
+            # Roughly map battery % back to joules (assuming 100% = 1000 J)
+            batt_pct = n.get("battery", 100)
+            try:
+                node.battery_j = max(0, float(batt_pct) / 100.0 * 1000.0)
+            except Exception:
+                pass
+            # Parent link if present
+            if hasattr(node, "connected_parent_id"):
+                node.connected_parent_id = n.get("parent_id")
 
     def add_dynamic_node(self, node_type, x, y, is_mobile=False):
         clean_type = node_type.replace("Add ", "").split()[0]

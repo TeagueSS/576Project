@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import sys
 import os
 from ..utils.exporter import export_results
@@ -75,6 +75,7 @@ class ModernIotApp(tk.Tk):
         self.btn_run.pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar, text="↻ RESET", command=self.reset_simulation).pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar, text="💾 SAVE RESULTS", command=self.save_results).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar, text="📂 LOAD SNAPSHOT", command=self.load_snapshot).pack(side=tk.LEFT, padx=5)
         spd_frame = ttk.Frame(toolbar, style="Card.TFrame")
         spd_frame.pack(side=tk.LEFT, padx=30)
         ttk.Label(spd_frame, text="Speed:", style="Card.TLabel").pack(side=tk.LEFT, padx=5)
@@ -151,6 +152,26 @@ class ModernIotApp(tk.Tk):
     def trigger_failover(self):
         if self.loader.broker:
             self.sim_env.env.process(self.loader.broker.failover_sequence(10.0))
+
+    def load_snapshot(self):
+        """Load a saved JSON snapshot and rebuild the scenario."""
+        path = filedialog.askopenfilename(
+            title="Select snapshot JSON",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            self.is_running = False
+            self.sim_env = SimulationEnvironment()
+            self.metrics = MetricsCollector()
+            self.loader = ScenarioLoader(self.sim_env.env, self.metrics)
+            self.history = {"queue": [0] * 50}
+            self.loader.load_from_snapshot(path)
+            self._refresh_gui_data()
+            messagebox.showinfo("Load Snapshot", f"Loaded snapshot:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Load Snapshot", f"Failed to load snapshot:\n{e}")
 
     def save_results(self):
         """Export a richer snapshot (JSON + CSV) to ./exports."""
