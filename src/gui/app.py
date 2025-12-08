@@ -15,7 +15,7 @@ from .views.stats_panel import StatsPanel
 from .views.palette import NodePalette
 from .views.queue_sparkline import QueueSparkline
 from .views.topic_heatmap import TopicHeatmap
-from .views.node_table import NodeTable  # <--- Added Import
+from .views.node_table import NodeTable
 
 COLORS = {"bg": "#E3E9EE", "panel_bg": "#FFFFFF", "header_bg": "#2C3E50", "text_primary": "#2C3E50",
           "primary": "#3498DB", "danger": "#E74C3C"}
@@ -106,7 +106,6 @@ class ModernIotApp(tk.Tk):
         self.stats_panel = StatsPanel(sidebar)
         self.stats_panel.pack(fill=tk.X, pady=(0, 15))
 
-        # <--- Added NodeTable to Sidebar --->
         self.node_table = NodeTable(sidebar)
         self.node_table.pack(fill=tk.X, pady=(0, 15))
 
@@ -172,12 +171,22 @@ class ModernIotApp(tk.Tk):
         self.map_view.update_state(nodes, [], current_sel, [], {})
         self.stats_panel.update_metrics(self.metrics)
 
-        # <--- Update NodeTable with fresh data --->
         if hasattr(self, 'node_table'):
             self.node_table.update_table(nodes)
 
+        # --- FIX: Track BOTH Broker Queue AND Client Outgoing Queues ---
         broker_q = sum([len(q) for q in self.loader.broker.client_queues.values()])
-        self.history["queue"].append(broker_q)
+
+        client_q = 0
+        if self.loader.nodes:
+            for n in self.loader.nodes:
+                if hasattr(n, "mqtt") and hasattr(n.mqtt, "msg_queue"):
+                    client_q += len(n.mqtt.msg_queue)
+
+        total_backlog = broker_q + client_q
+        # ---------------------------------------------------------------
+
+        self.history["queue"].append(total_backlog)
         if len(self.history["queue"]) > 50: self.history["queue"].pop(0)
         self.queue_view.update_plot(self.history["queue"])
         rates = self.metrics.get_topic_rates(self.sim_env.now, window=3.0)
