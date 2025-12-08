@@ -7,6 +7,8 @@ class MqttBroker:
         self.env = env
         self.metrics = metrics_collector
         self.is_alive = True
+        self.last_failover_start = None
+        self.last_failover_end = None
 
         # Map: topic_filter -> list of client_ids
         self.subscriptions = {}
@@ -21,6 +23,7 @@ class MqttBroker:
     def failover_sequence(self, downtime_s):
         """Simulate a crash and reboot."""
         self.is_alive = False
+        self.last_failover_start = float(self.env.now)
         print(f"[{self.env.now:.2f}] !!! BROKER CRASH !!!")
 
         # NEW: Force disconnect everyone (Simulate TCP Reset)
@@ -33,6 +36,7 @@ class MqttBroker:
 
         yield self.env.timeout(downtime_s)
         self.is_alive = True
+        self.last_failover_end = float(self.env.now)
         print(f"[{self.env.now:.2f}] ... BROKER RECOVERED ...")
 
     def connect(self, client_id, client_instance, clean_session=True):

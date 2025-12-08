@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Dict, List, MutableMapping, Set
+from typing import Any, Dict, List, MutableMapping, Set, Deque
 
 
 @dataclass
@@ -27,6 +27,11 @@ class MetricsCollector:
         # NEW: Track last activity time for visual lines
         self._last_activity: Dict[str, float] = {}
 
+        # Topic-level tracking
+        self._published_per_topic: MutableMapping[str, int] = defaultdict(int)
+        self._delivered_per_topic: MutableMapping[str, int] = defaultdict(int)
+        self._topic_latency_sum: MutableMapping[str, float] = defaultdict(float)
+
     def record_publish(
         self,
         message_id: str,
@@ -41,6 +46,7 @@ class MetricsCollector:
         )
         # Record that this node just did something
         self._last_activity[publisher_id] = timestamp
+        self._published_per_topic[topic] += 1
 
     def record_delivery(
         self,
@@ -60,6 +66,8 @@ class MetricsCollector:
             self._duplicates += 1
         else:
             self._delivered_messages.add(message_id)
+            self._delivered_per_topic[info.topic] += 1
+            self._topic_latency_sum[info.topic] += latency
 
         self._delivery_history.append((timestamp, info.topic))
 
@@ -107,3 +115,21 @@ class MetricsCollector:
             "duplicates": self._duplicates,
             "total_energy_j": sum(self._energy_joules.values()),
         }
+
+    # --- Detailed readers for export ---
+    def topic_publish_counts(self) -> Dict[str, int]:
+        return dict(self._published_per_topic)
+
+    def topic_delivery_stats(self) -> Dict[str, Dict[str, float]]:
+        out: Dict[str, Dict[str, float]] = {}
+        for topic, delivered in self._delivered_per_topic.items():
+            total_latency = self._topic_latency_sum.get(topic, 0.0)
+            avg_latency = total_latency / delivered if delivered else 0.0
+            out[topic] = {
+                "delivered": delivered,
+                "avg_latency": avg_latency,
+            }
+        return out
+
+    def energy_by_device(self) -> Dict[str, float]:
+        return dict(self._energy_joules)

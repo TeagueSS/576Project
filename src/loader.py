@@ -126,6 +126,7 @@ class ScenarioLoader:
         if "Gateway" in clean_type:
             node = Gateway(self.env, new_id, (x, y), self.cloud_broker_proxy, self._get_network_nodes)
             self.gw_pos = (x, y)
+            node.is_gateway = True
         else:
             node = SensorNode(self.env, new_id, (x, y), radio, self.broker, self._get_network_nodes)
 
@@ -156,7 +157,7 @@ class ScenarioLoader:
 
         for n in self.nodes:
             ntype = "Sensor"
-            if "Gateway" in n.id:
+            if getattr(n, "is_gateway", False) or "Gateway" in n.id:
                 ntype = "Gateway"
             elif "Laptop" in n.id:
                 ntype = "Laptop"

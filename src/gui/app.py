@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import os
+from ..utils.exporter import export_results
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 
@@ -73,6 +74,7 @@ class ModernIotApp(tk.Tk):
         self.btn_run = ttk.Button(toolbar, text="▶ START", style="Accent.TButton", command=self.toggle_run)
         self.btn_run.pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar, text="↻ RESET", command=self.reset_simulation).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar, text="💾 SAVE RESULTS", command=self.save_results).pack(side=tk.LEFT, padx=5)
         spd_frame = ttk.Frame(toolbar, style="Card.TFrame")
         spd_frame.pack(side=tk.LEFT, padx=30)
         ttk.Label(spd_frame, text="Speed:", style="Card.TLabel").pack(side=tk.LEFT, padx=5)
@@ -149,6 +151,32 @@ class ModernIotApp(tk.Tk):
     def trigger_failover(self):
         if self.loader.broker:
             self.sim_env.env.process(self.loader.broker.failover_sequence(10.0))
+
+    def save_results(self):
+        """Export a richer snapshot (JSON + CSV) to ./exports."""
+        if not self.metrics or not self.sim_env or not self.loader:
+            messagebox.showerror("Save Results", "Simulation has not been initialized.")
+            return
+
+        run_meta = {
+            "selected_tool": self.current_tool,
+            "sim_speed": self.sim_speed.get(),
+            "seed": getattr(self.sim_env, "seed", None),
+        }
+        try:
+            paths = export_results(
+                sim_env=self.sim_env,
+                metrics=self.metrics,
+                history=self.history,
+                loader=self.loader,
+                run_meta=run_meta,
+            )
+            messagebox.showinfo(
+                "Save Results",
+                f"Saved results:\n{paths['json']}\n{paths['csv']}",
+            )
+        except Exception as e:
+            messagebox.showerror("Save Results", f"Failed to export: {e}")
 
     def update_loop(self):
         if self.is_running and self.sim_env:

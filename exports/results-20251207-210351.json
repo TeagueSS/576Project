@@ -1,0 +1,138 @@
+{
+  "timestamp": "20251207-210351",
+  "sim_time": 21.799999999999955,
+  "run_meta": {
+    "selected_tool": "Select",
+    "sim_speed": 1.0,
+    "seed": 0
+  },
+  "protocol": "wifi",
+  "gateway_position": [
+    250,
+    250
+  ],
+  "failover_info": {
+    "last_start": null,
+    "last_end": null
+  },
+  "summary": {
+    "delivery_ratio": 1.0,
+    "avg_latency": 0.028814077666729613,
+    "duplicates": 0,
+    "total_energy_j": 1.3229182146666665
+  },
+  "topic_rates_msgs_per_sec": {
+    "sensors/temp": 0.6666666666666666,
+    "sensors/humidity": 0.6666666666666666
+  },
+  "topic_publish_counts": {
+    "sensors/humidity": 13,
+    "sensors/temp": 13
+  },
+  "topic_delivery_stats": {
+    "sensors/humidity": {
+      "delivered": 13,
+      "avg_latency": 0.03209139149778127
+    },
+    "sensors/temp": {
+      "delivered": 13,
+      "avg_latency": 0.025536763835677958
+    }
+  },
+  "queue_depth_history": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "nodes": [
+    {
+      "id": "Gate_681",
+      "x": 250,
+      "y": 250,
+      "type": "Gateway",
+      "state": "active",
+      "battery": 100,
+      "protocol": "wifi",
+      "mqtt_connected": false,
+      "parent_id": null,
+      "retries": 5,
+      "next_retry": 10.0,
+      "energy_j": 0.0
+    },
+    {
+      "id": "Lapt_420",
+      "x": 280,
+      "y": 250,
+      "type": "Sensor",
+      "state": "active",
+      "battery": 99,
+      "protocol": "wifi",
+      "mqtt_connected": true,
+      "parent_id": "Gate_681",
+      "retries": 0,
+      "next_retry": 0.0,
+      "energy_j": 0.6614591073333332
+    },
+    {
+      "id": "iPho_725",
+      "x": 200,
+      "y": 220,
+      "type": "Sensor",
+      "state": "active",
+      "battery": 99,
+      "protocol": "wifi",
+      "mqtt_connected": true,
+      "parent_id": "Gate_681",
+      "retries": 0,
+      "next_retry": 0.0,
+      "energy_j": 0.6614591073333332
+    }
+  ]
+}
